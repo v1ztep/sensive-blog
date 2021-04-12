@@ -4,10 +4,21 @@ from django.contrib.auth.models import User
 
 
 class PostQuerySet(models.QuerySet):
-    def year(self, year):
-        posts_at_year = self.filter(published_at__year=year)\
-                            .order_by('published_at')
-        return posts_at_year
+    def popular(self):
+        popular_posts = self.annotate(models.Count('likes'))\
+                            .order_by('-likes__count')
+        return popular_posts
+
+    def fetch_with_comments_count(self):
+        posts_ids = [post.id for post in self]
+        posts_with_comments = Post.objects.filter(
+                                            id__in=posts_ids)\
+                                          .annotate(models.Count('comments'))
+        ids_and_comments = posts_with_comments.values_list('id', 'comments__count')
+        count_for_id = dict(ids_and_comments)
+        for post in self:
+            post.comments__count = count_for_id[post.id]
+        return self
 
 
 class Post(models.Model):
