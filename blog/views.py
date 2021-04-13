@@ -38,25 +38,34 @@ def serialize_post_optimized(post):
 def serialize_tag(tag):
     return {
         'title': tag.title,
-        'posts_with_tag': len(Post.objects.filter(tags=tag)),
+        'posts_with_tag': tag.posts.count(),
+    }
+
+
+def serialize_tag_optimized(tag):
+    return {
+        'title': tag.title,
+        'posts_with_tag': tag.posts__count,
     }
 
 
 def index(request):
-    most_popular_posts = Post.objects.popular()[:5]\
-                                     .prefetch_related('author')\
+    most_popular_posts = Post.objects.popular()[:5] \
+                                     .prefetch_related('author', 'tags') \
                                      .fetch_with_comments_count()
 
-    most_fresh_posts = Post.objects.order_by('-published_at')[:5]\
-                                   .annotate(Count('comments'))\
-                                   .prefetch_related('author')
+    most_fresh_posts = Post.objects.order_by('-published_at')[:5] \
+                                   .annotate(Count('comments')) \
+                                   .prefetch_related('author', 'tags')
 
-    most_popular_tags = Tag.objects.popular()[:5]
+    most_popular_tags = Tag.objects.popular()[:5] \
+                                   .annotate(Count('posts')) \
+                                   .prefetch_related('posts')
 
     context = {
         'most_popular_posts': [serialize_post_optimized(post) for post in most_popular_posts],
         'page_posts': [serialize_post_optimized(post) for post in most_fresh_posts],
-        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
 
@@ -90,7 +99,7 @@ def post_detail(request, slug):
 
     most_popular_tags = Tag.objects.popular()[:5]
 
-    most_popular_posts = Post.objects.popular()[:5]\
+    most_popular_posts = Post.objects.popular()[:5] \
                                      .prefetch_related('author') \
                                      .fetch_with_comments_count()
 
